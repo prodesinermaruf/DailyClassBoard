@@ -1,0 +1,193 @@
+<!doctype html>
+<html lang="bn">
+<head>
+    <link rel="icon" type="image/png" href="2.png"><link rel="icon" type="image/png" href="image.png">
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>DailyClassBoard</title>
+  <style>
+    :root{
+      --bg:#6e77a1;
+      --panel:#6f7386;
+      --card:#bfc4d6aa;
+      --accent:#4b4f63;
+      --muted:#f7f7fb;
+      --shadow: 6px 6px 0 rgba(0,0,0,0.15);
+      font-family: "Courier New", Courier, monospace;
+    }
+    html,body{height:100%;margin:0;background:var(--bg);color:#fff;}
+    .container{max-width:1100px;margin:40px auto;padding:30px;}
+    .controls{
+      display:flex;gap:12px;align-items:center;margin-bottom:28px;
+    }
+    .select-box{
+      background:var(--panel);padding:8px 12px;border-radius:6px;box-shadow:var(--shadow);
+      display:flex;gap:8px;align-items:center;
+    }
+    .select-box label{font-size:14px;margin-right:6px;opacity:0.9;}
+    select{background:transparent;border:0;color:#fff;font-size:14px;outline:none}
+    .list{display:flex;flex-direction:column;gap:34px;}
+    .card{
+      display:flex;gap:20px;align-items:flex-start;
+      background:transparent;padding:6px 0;
+    }
+
+    .date-pill{
+      min-width:160px;max-width:180px;
+      background:var(--accent);padding:12px;border-radius:6px;
+      box-shadow:var(--shadow);text-align:center;
+      transform: translateY(6px);
+    }
+    .date-pill h3{margin:0;font-size:18px;font-weight:700;}
+    .date-pill p{margin:6px 0 0;font-size:12px;opacity:0.9;color:var(--muted);}
+
+    .content{
+      flex:1;background:rgba(255,255,255,0.04);padding:18px;border-radius:6px;
+      box-shadow: 0 6px 12px rgba(0,0,0,0.08);position:relative;
+    }
+    .content p{margin:0 0 12px;line-height:1.45;font-size:13px;color:rgba(255,255,255,0.9);}
+    .meta{
+      display:flex;gap:12px;align-items:center;flex-wrap:wrap;
+      margin-top:6px;
+    }
+    .meta label{font-size:13px;min-width:110px;color:#e9e9ff;}
+    .meta input[type="text"], .meta input[type="date"]{
+      padding:8px;border-radius:6px;border:1px solid rgba(255,255,255,0.08);
+      background:rgba(255,255,255,0.02);color:#fff;font-size:13px;outline:none;
+    }
+    .meta button{
+      padding:8px 12px;border-radius:6px;border:0;background:var(--panel);color:#fff;cursor:pointer;
+      box-shadow: 2px 2px 0 rgba(0,0,0,0.12);
+    }
+    .saved-note{font-size:12px;color:rgba(255,255,255,0.7);margin-left:8px;}
+    @media (max-width:800px){
+      .card{flex-direction:column;}
+      .date-pill{width:100%;display:flex;justify-content:center;}
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <div class="controls">
+      <div class="select-box" aria-hidden="false">
+        <label for="semester">সেমিস্টার</label>
+        <select id="semester">
+          <option value="1st">১ম</option>
+          <option value="2nd">২য়</option>
+          <option value="3rd">৩য়</option>
+          <option value="Final">ফাইনাল</option>
+        </select>
+      </div>
+
+      <div class="select-box">
+        <label for="shift">শিফট</label>
+        <select id="shift">
+          <option value="morning">সকাল</option>
+          <option value="day">দিবা</option>
+          <option value="evening">সন্ধ্যা</option>
+        </select>
+      </div>
+
+      <div style="margin-left:auto;color:#fff;font-size:14px;opacity:0.95">
+        চয়ন: <span id="sel-display">১ম • সকাল</span>
+      </div>
+    </div>
+
+    <div class="list" id="blogList">
+      <!-- ব্লগ আইটেমগুলো এখানে রেন্ডার হবে -->
+    </div>
+  </div>
+
+  <script>
+    // নমুনা ব্লগ ডেটা (তুমি চাইলে সার্ভার থেকে আনবে)
+    const blogs = [
+      { id: 'b1', title: 'November 1', text: 'এইখানে তোমার ব্লগ/অ্যাসাইনমেন্ট টেক্সট যাবে — ক্লাস ক্যাপটেন লিখবে এবং জমা দেওয়ার তারিখ দেবার অপশন আছে।' },
+      { id: 'b2', title: 'November 2', text: 'আরেকটি ব্লগ এন্ট্রি — তুমি এখানে বিস্তারিত লিখতে পারো।' },
+      { id: 'b3', title: 'November 3', text: 'তৃতীয় এন্ট্রি — টেক্সট লোরেম ইপসাম হিসেবে আছে।' }
+    ];
+
+    const blogList = document.getElementById('blogList');
+    const semester = document.getElementById('semester');
+    const shift = document.getElementById('shift');
+    const selDisplay = document.getElementById('sel-display');
+
+    // লোকালস্টোরেজে সেভ করা ইনফো লোড করার হেল্পার
+    function loadSaved(id){
+      try {
+        const raw = localStorage.getItem('blog_meta_' + id);
+        return raw ? JSON.parse(raw) : {};
+      } catch(e){ return {}; }
+    }
+    function saveMeta(id, meta){
+      localStorage.setItem('blog_meta_' + id, JSON.stringify(meta));
+    }
+
+    function render(){
+      blogList.innerHTML = '';
+      blogs.forEach(b => {
+        const saved = loadSaved(b.id);
+        const card = document.createElement('div');
+        card.className = 'card';
+        card.innerHTML = `
+          <div class="date-pill" aria-hidden="true">
+            <h3>${b.title}</h3>
+            <p>Submit by</p>
+          </div>
+          <div class="content">
+            <p>${b.text}</p>
+            <div class="meta">
+              <label>Class Captain</label>
+              <input type="text" data-id="${b.id}" data-field="captain" value="${saved.captain || ''}" placeholder="ক্লাস ক্যাপটেনের নাম">
+              <label>Submit date</label>
+              <input type="date" data-id="${b.id}" data-field="date" value="${saved.date || ''}">
+              <button data-id="${b.id}" class="save-btn">Save</button>
+              <span class="saved-note" id="note-${b.id}">${saved.saved ? 'Saved' : ''}</span>
+            </div>
+          </div>
+        `;
+        blogList.appendChild(card);
+      });
+
+      // attach handlers
+      document.querySelectorAll('.save-btn').forEach(btn=>{
+        btn.addEventListener('click', (e)=>{
+          const id = btn.getAttribute('data-id');
+          const inputs = document.querySelectorAll(`input[data-id="${id}"]`);
+          const meta = {};
+          inputs.forEach(i => { meta[i.dataset.field] = i.value; });
+          meta.saved = true;
+          saveMeta(id, meta);
+          const note = document.getElementById('note-' + id);
+          if(note) note.textContent = 'Saved';
+        });
+      });
+    }
+
+    // update selected display
+    function updateSelDisplay(){
+      const semText = semester.options[semester.selectedIndex].text;
+      const shiftText = shift.options[shift.selectedIndex].text;
+      selDisplay.textContent = `${semText} • ${shiftText}`;
+    }
+
+    // init
+    render();
+    updateSelDisplay();
+
+    semester.addEventListener('change', updateSelDisplay);
+    shift.addEventListener('change', updateSelDisplay);
+
+    // load saved notes indicator for each
+    blogs.forEach(b=>{
+      const s = loadSaved(b.id);
+      if(s.saved){
+        // show "Saved" text after render completes
+        setTimeout(()=> {
+          const note = document.getElementById('note-' + b.id);
+          if(note) note.textContent = 'Saved';
+        }, 50);
+      }
+    });
+  </script>
+</body>
+</html>
